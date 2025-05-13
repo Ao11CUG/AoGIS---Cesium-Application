@@ -4,6 +4,7 @@
 
 <script>
 import { SpatialAnalysis } from '../utils/SpatialAnalysis'
+import { BuildingInfoTool } from '../utils/BuildingInfoTool'
 
 export default {
   name: 'CesiumViewer',
@@ -20,7 +21,9 @@ export default {
       // 地形图层
       terrainProvider: null,
       // 空间分析工具
-      spatialAnalysis: null
+      spatialAnalysis: null,
+      // 建筑信息工具
+      buildingInfoTool: null,
     }
   },
   mounted() {
@@ -33,7 +36,7 @@ export default {
       vrButton: false,
       geocoder: true,
       homeButton: false,
-      infoBox: false,
+      infoBox: true,
       sceneModePicker: false,
       selectionIndicator: false,
       timeline: false,
@@ -59,6 +62,8 @@ export default {
       console.log('Cesium viewer fully initialized')
       // 初始化空间分析工具
       this.spatialAnalysis = new SpatialAnalysis(this.viewer)
+      // 初始化建筑信息工具
+      this.buildingInfoTool = new BuildingInfoTool(this.viewer)
       // 通知父组件viewer已准备好
       this.$emit('viewer-ready', this.viewer)
     }).catch(error => {
@@ -317,9 +322,12 @@ export default {
       }
     }
   },
-  beforeUnmount() {
+  beforeDestroy() {
+    if (this.buildingInfoTool) {
+      this.buildingInfoTool.destroy();
+    }
     if (this.viewer) {
-      this.viewer.destroy()
+      this.viewer.destroy();
     }
   }
 }

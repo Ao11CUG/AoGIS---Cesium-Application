@@ -119,16 +119,15 @@
       </div>
 
       <!-- 影像图层悬浮窗 -->
-      <div class="floating-window" v-show="isImageryOpen" :style="{ left: imageryPosition.x + 'px', top: imageryPosition.y + 'px' }">
+      <div class="floating-window" v-show="isImageryOpen" :class="{'minimized': isImageryMinimized}" :style="{ left: imageryPosition.x + 'px', top: imageryPosition.y + 'px' }">
         <div class="window-header" @mousedown="startDrag($event, 'imagery')">
-          <div class="drag-handle">
-            <span class="drag-icon">⋮⋮</span>
-            <span class="drag-text">拖动</span>
-          </div>
           <span class="window-title">影像图层</span>
-          <button class="close-button" @click="toggleDrawer('imagery')">×</button>
+          <div class="window-controls">
+            <button class="minimize-button" @click.stop="toggleMinimize('imagery', $event)">⌄</button>
+            <button class="close-button" @click="toggleDrawer('imagery')">×</button>
+          </div>
         </div>
-        <div class="window-content">
+        <div class="window-content" v-show="!isImageryMinimized">
           <div class="control-group">
             <button 
               class="control-button" 
@@ -167,16 +166,15 @@
       </div>
 
       <!-- 地形悬浮窗 -->
-      <div class="floating-window" v-show="isTerrainOpen" :style="{ left: terrainPosition.x + 'px', top: terrainPosition.y + 'px' }">
+      <div class="floating-window" v-show="isTerrainOpen" :class="{'minimized': isTerrainMinimized}" :style="{ left: terrainPosition.x + 'px', top: terrainPosition.y + 'px' }">
         <div class="window-header" @mousedown="startDrag($event, 'terrain')">
-          <div class="drag-handle">
-            <span class="drag-icon">⋮⋮</span>
-            <span class="drag-text">拖动</span>
-          </div>
           <span class="window-title">地形</span>
-          <button class="close-button" @click="toggleDrawer('terrain')">×</button>
+          <div class="window-controls">
+            <button class="minimize-button" @click.stop="toggleMinimize('terrain', $event)">⌄</button>
+            <button class="close-button" @click="toggleDrawer('terrain')">×</button>
+          </div>
         </div>
-        <div class="window-content">
+        <div class="window-content" v-show="!isTerrainMinimized">
           <button class="drawer-button" @click="$emit('switch-terrain', 'world')">
             <span class="icon">⛰️</span>
             <span class="text">世界地形</span>
@@ -193,16 +191,15 @@
       </div>
 
       <!-- 数据加载悬浮窗 -->
-      <div class="floating-window" v-show="isDataOpen" :style="{ left: dataPosition.x + 'px', top: dataPosition.y + 'px' }">
+      <div class="floating-window" v-show="isDataOpen" :class="{'minimized': isDataMinimized}" :style="{ left: dataPosition.x + 'px', top: dataPosition.y + 'px' }">
         <div class="window-header" @mousedown="startDrag($event, 'data')">
-          <div class="drag-handle">
-            <span class="drag-icon">⋮⋮</span>
-            <span class="drag-text">拖动</span>
-          </div>
           <span class="window-title">数据加载</span>
-          <button class="close-button" @click="toggleDrawer('data')">×</button>
+          <div class="window-controls">
+            <button class="minimize-button" @click.stop="toggleMinimize('data', $event)">⌄</button>
+            <button class="close-button" @click="toggleDrawer('data')">×</button>
+          </div>
         </div>
-        <div class="window-content">
+        <div class="window-content" v-show="!isDataMinimized">
           <div class="data-load-group">
             <div class="input-group">
               <input type="number" v-model="assetId" placeholder="输入Asset ID" class="asset-input">
@@ -233,11 +230,24 @@
               <!-- 颜色设置 -->
               <div class="style-section">
                 <h5>分色渲染</h5>
-                <div class="color-setting" v-for="(color, type) in colorSettings" :key="type">
-                  <label>{{type}}:</label>
-                  <input type="color" v-model="color.value" @change="handleStyleChange">
-                  <input type="number" v-model="color.alpha" min="0" max="1" step="0.1" @change="handleStyleChange">
+                <!-- 字段选择 -->
+                <div class="field-select">
+                  <label>渲染字段:</label>
+                  <select v-model="renderSettings.field" @change="handleFieldChange">
+                    <option value="">请选择字段</option>
+                    <option v-for="field in availableFields" :key="field" :value="field">{{field}}</option>
+                  </select>
                 </div>
+                
+                <!-- 分类渲染设置 -->
+                <div v-if="renderSettings.field" class="category-settings">
+                  <div class="color-setting" v-for="(color, value) in renderSettings.categoryColors" :key="value">
+                    <label>{{value}}:</label>
+                    <input type="color" v-model="color.value" @change="handleStyleChange">
+                    <input type="number" v-model="color.alpha" min="0" max="1" step="0.1" @change="handleStyleChange">
+                  </div>
+                </div>
+
               </div>
 
               <!-- 高度设置 -->
@@ -301,16 +311,15 @@
       </div>
 
       <!-- 空间分析悬浮窗 -->
-      <div class="floating-window" v-show="isAnalysisOpen" :style="{ left: analysisPosition.x + 'px', top: analysisPosition.y + 'px' }">
+      <div class="floating-window" v-show="isAnalysisOpen" :class="{'minimized': isAnalysisMinimized}" :style="{ left: analysisPosition.x + 'px', top: analysisPosition.y + 'px' }">
         <div class="window-header" @mousedown="startDrag($event, 'analysis')">
-          <div class="drag-handle">
-            <span class="drag-icon">⋮⋮</span>
-            <span class="drag-text">拖动</span>
-          </div>
           <span class="window-title">空间分析</span>
-          <button class="close-button" @click="toggleDrawer('analysis')">×</button>
+          <div class="window-controls">
+            <button class="minimize-button" @click.stop="toggleMinimize('analysis', $event)">⌄</button>
+            <button class="close-button" @click="toggleDrawer('analysis')">×</button>
+          </div>
         </div>
-        <div class="window-content">
+        <div class="window-content" v-show="!isAnalysisMinimized">
           <div class="analysis-group">
             <button class="drawer-button" @click="startAnalysis('path')">
               <span class="icon">🛣️</span>
@@ -422,11 +431,8 @@
       class="floating-controls"
       :style="{ left: position.x + 'px', top: position.y + 'px' }"
       ref="floatingControls"
+      @mousedown="startDrag"
     >
-      <div class="drag-handle" @mousedown="startDrag">
-        <span class="drag-icon">⋮⋮</span>
-        <span class="drag-text">拖动</span>
-      </div>
       <div class="search-box">
         <input 
           type="text" 
@@ -569,6 +575,12 @@ export default {
       isCameraOpen: false,
       isDataOpen: false,
       isAnalysisOpen: false,
+      // 添加最小化状态变量
+      isImageryMinimized: false,
+      isTerrainMinimized: false,
+      isDataMinimized: false,
+      isAnalysisMinimized: false,
+      // 原有变量
       currentAnalysis: null,
       imageryPosition: { x: 300, y: 70 },
       terrainPosition: { x: 500, y: 70 },
@@ -689,7 +701,13 @@ export default {
         startLat: null,
         startLon: null
       },
-      facilityResults: []
+      facilityResults: [],
+      renderSettings: {
+        field: '',
+        mode: 'category',
+        categoryColors: {}
+      },
+      availableFields: []
     }
   },
   watch: {
@@ -791,8 +809,39 @@ export default {
           break
       }
     },
+    // 添加切换最小化状态的方法
+    toggleMinimize(windowType, event) {
+      // 阻止事件冒泡，防止触发拖动
+      event.stopPropagation();
+      
+      // 记录当前操作
+      console.log(`切换窗口 ${windowType} 的最小化状态`);
+      
+      switch(windowType) {
+        case 'imagery':
+          this.isImageryMinimized = !this.isImageryMinimized;
+          console.log(`影像图层窗口最小化状态: ${this.isImageryMinimized}`);
+          break;
+        case 'terrain':
+          this.isTerrainMinimized = !this.isTerrainMinimized;
+          console.log(`地形窗口最小化状态: ${this.isTerrainMinimized}`);
+          break;
+        case 'data':
+          this.isDataMinimized = !this.isDataMinimized;
+          console.log(`数据加载窗口最小化状态: ${this.isDataMinimized}`);
+          break;
+        case 'analysis':
+          this.isAnalysisMinimized = !this.isAnalysisMinimized;
+          console.log(`空间分析窗口最小化状态: ${this.isAnalysisMinimized}`);
+          break;
+      }
+    },
     startDrag(event, windowType) {
-      if (event.target.classList.contains('close-button')) return;
+      // 如果点击的是关闭按钮或最小化按钮，不触发拖动
+      if (event.target.classList.contains('close-button') || 
+          event.target.classList.contains('minimize-button')) {
+        return;
+      }
       
       this.isDragging = true;
       this.currentWindow = windowType;
@@ -911,11 +960,43 @@ export default {
     handleGeoJSONFile(event) {
       const file = event.target.files[0]
       if (file) {
-        this.currentGeoJSONFile = file
-        this.$emit('load-geojson', file, {
-          colors: this.colorSettings,
-          height: this.heightSettings
-        })
+        // 读取文件内容
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          try {
+            const geojsonData = JSON.parse(e.target.result)
+            
+            // 解析所有可用的属性字段
+            const fields = new Set()
+            if (geojsonData.features && geojsonData.features.length > 0) {
+              geojsonData.features.forEach(feature => {
+                if (feature.properties) {
+                  Object.keys(feature.properties).forEach(key => fields.add(key))
+                }
+              })
+            }
+            
+            // 更新可用字段列表
+            this.availableFields = Array.from(fields)
+            
+            // 重置渲染设置
+            this.renderSettings.field = ''
+            this.renderSettings.categoryColors = {}
+            
+            // 保存当前GeoJSON文件
+            this.currentGeoJSONFile = file
+            
+            // 发出加载事件
+            this.$emit('load-geojson', file, {
+              renderSettings: this.renderSettings,
+              height: this.heightSettings
+            })
+          } catch (error) {
+            console.error('解析GeoJSON文件失败:', error)
+            alert('解析GeoJSON文件失败，请确保文件格式正确')
+          }
+        }
+        reader.readAsText(file)
       }
     },
     handleModelLoad() {
@@ -1009,10 +1090,62 @@ export default {
       }
     },
     handleStyleChange() {
+      console.log('发送样式更新，renderSettings:', this.renderSettings)
       this.$emit('update-geojson-style', {
-        colors: this.colorSettings,
+        renderSettings: this.renderSettings,
         height: this.heightSettings
       })
+    },
+    handleFieldChange() {
+      if (!this.renderSettings.field) return
+      
+      // 清空现有的颜色设置
+      this.renderSettings.categoryColors = {}
+      
+      // 读取当前文件以获取字段的所有唯一值
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const geojsonData = JSON.parse(e.target.result)
+          const uniqueValues = new Set()
+          
+          // 收集选定字段的所有唯一值
+          geojsonData.features.forEach(feature => {
+            if (feature.properties && feature.properties[this.renderSettings.field] !== undefined) {
+              uniqueValues.add(feature.properties[this.renderSettings.field])
+            }
+          })
+          
+          // 为每个唯一值生成随机颜色
+          uniqueValues.forEach(value => {
+            this.renderSettings.categoryColors[value] = {
+              value: this.generateRandomColor(),
+              alpha: 0.8
+            }
+          })
+          
+          // 更新样式
+          this.handleStyleChange()
+          
+          // 通知父组件需要更新视图
+          this.$emit('update-geojson-view')
+        } catch (error) {
+          console.error('处理字段值失败:', error)
+        }
+      }
+      reader.readAsText(this.currentGeoJSONFile)
+    },
+    generateRandomColor() {
+      const letters = '0123456789ABCDEF'
+      let color = '#'
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)]
+      }
+      return color
+    },
+    handleRenderModeChange() {
+      // 分类渲染模式是唯一选项，不需要特殊处理
+      this.$emit('update-render-mode', 'category')
     },
     startAnalysis(type) {
       this.currentAnalysis = type;
@@ -1342,6 +1475,42 @@ export default {
   color: #ecf0f1;
   font-weight: 500;
   font-size: 0.9em;
+  flex: 1;
+  text-align: left;
+  margin-left: 4px;
+}
+
+.window-controls {
+  display: flex;
+  align-items: center;
+}
+
+.minimize-button {
+  background: none;
+  border: none;
+  color: #ecf0f1;
+  font-size: 1.2em;
+  cursor: pointer;
+  padding: 0 4px;
+  margin-right: 4px;
+  transition: color 0.2s ease, transform 0.2s ease;
+  line-height: 1;
+  z-index: 10; /* 确保按钮在最上层，可点击 */
+}
+
+.minimize-button:hover {
+  color: #3498db;
+  transform: scale(1.1);
+}
+
+/* 最小化状态下的按钮样式 */
+.floating-window.minimized .minimize-button {
+  color: #3498db; /* 使用蓝色表示可以展开 */
+  transform: rotate(180deg); /* 旋转图标 */
+}
+
+.floating-window.minimized .minimize-button:hover {
+  color: #2980b9;
 }
 
 .close-button {
@@ -1356,6 +1525,10 @@ export default {
 
 .close-button:hover {
   color: #e74c3c;
+}
+
+.floating-window.minimized .window-header {
+  border-radius: 8px;
 }
 
 .window-content {
@@ -1473,6 +1646,7 @@ export default {
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
+/* 为左上角浮动控制窗口保留drag-handle样式 */
 .drag-handle {
   display: flex;
   align-items: center;
@@ -2269,5 +2443,28 @@ export default {
 .info-row span {
   flex: 1;
   word-break: break-all;
+}
+
+.field-select {
+  margin-bottom: 10px;
+}
+
+.category-settings {
+  margin-bottom: 10px;
+}
+
+.gradient-settings {
+}
+
+.gradient-range {
+}
+
+.range-input {
+}
+
+.gradient-colors {
+}
+
+.color-input {
 }
 </style> 

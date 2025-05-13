@@ -705,6 +705,9 @@ export default {
     async loadGeoJSON(file, styleSettings) {
       if (!this.checkViewerReady()) return
 
+      // 清除任何残留的图例
+      this.clearLegend();
+
       const reader = new FileReader()
       reader.onload = (e) => {
         try {
@@ -785,8 +788,38 @@ export default {
             // 应用样式设置
             this.applyGeoJSONStyle(dataSource, styleSettings)
             
-            // 调整视角
-            this.viewer.zoomTo(dataSource)
+            // 先尝试计算GeoJSON的边界，以便更精确地定位
+            if (dataSource.entities.values.length > 0) {
+              console.log('调整视图到GeoJSON数据区域...');
+              
+              try {
+                // 使用更可靠的flyTo方法，确保视图变化明显
+                this.viewer.flyTo(dataSource, {
+                  duration: 1.5,
+                  offset: new window.Cesium.HeadingPitchRange(
+                    0,
+                    window.Cesium.Math.toRadians(-45), // 俯视角度
+                    0 // 距离会自动计算
+                  )
+                }).then(() => {
+                  console.log('相机已移动到GeoJSON数据上方');
+                }).catch(error => {
+                  console.error('使用flyTo失败，尝试使用zoomTo:', error);
+                  // 如果flyTo失败，回退到zoomTo
+                  this.viewer.zoomTo(dataSource);
+                });
+              } catch (error) {
+                console.error('相机定位到GeoJSON数据失败:', error);
+                // 最后的尝试：使用更简单的方法
+                try {
+                  this.viewer.zoomTo(dataSource);
+                } catch (zoomError) {
+                  console.error('所有相机定位方法都失败:', zoomError);
+                }
+              }
+            } else {
+              console.warn('GeoJSON数据无实体，无法调整视图');
+            }
           }).catch(error => {
             console.error('Error loading GeoJSON:', error)
           })
@@ -797,147 +830,124 @@ export default {
       reader.readAsText(file)
     },
     applyGeoJSONStyle(dataSource, styleSettings) {
-      if (!dataSource || !styleSettings) return
+      if (!dataSource || !styleSettings) {
+        console.error('applyGeoJSONStyle: 缺少必要参数', { dataSource, styleSettings });
+        return;
+      }
 
-      const { colors, height } = styleSettings
-      const baseHeight = height?.baseHeight || 0
-      const heightScale = height?.heightScale || 1
+      console.log('应用GeoJSON样式:', styleSettings);
 
+      const { renderSettings, height } = styleSettings;
+      if (!renderSettings) {
+        console.error('applyGeoJSONStyle: 缺少渲染设置', styleSettings);
+        return;
+      }
+
+      const baseHeight = height?.baseHeight || 0;
+      const heightScale = height?.heightScale || 1;
+      
+      // 记录处理的实体数量，用于调试
+      let processedCount = 0;
+      let colorAppliedCount = 0;
+
+      // 处理每个实体
       dataSource.entities.values.forEach(entity => {
-        if (!entity.properties) return
+        if (!entity.properties) return;
+        processedCount++;
 
-        const type = entity.properties.type?._value?.toLowerCase()
-        const propertyHeight = entity.properties.height?._value || 0
-        const name = entity.properties.name?._value
-        const colorSetting = colors?.[type]
-
-        // 获取对比色
-        let contrastColor = window.Cesium.Color.WHITE
-        if (colorSetting) {
-          const color = window.Cesium.Color.fromCssColorString(colorSetting.value)
-          // 使用补色作为对比色
-          contrastColor = new window.Cesium.Color(
-            1.0 - color.red,
-            1.0 - color.green,
-            1.0 - color.blue,
-            1.0
-          )
-        }
-
+        // 获取选定字段的值和其他属性
+        const fieldValue = entity.properties[renderSettings.field]?._value;
+        const propertyHeight = entity.properties.height?._value || 0;
+        const name = entity.properties.name?._value;
+        
+        // 应用颜色（如果存在多边形）
         if (entity.polygon) {
-          // 设置多边形填充颜色
-          if (colorSetting) {
-            const color = window.Cesium.Color.fromCssColorString(colorSetting.value)
-              .withAlpha(colorSetting.alpha)
-            entity.polygon.material = color
+          let color;
+          let colorApplied = false;
+          
+          // 根据渲染模式和字段值设置颜色
+          if (renderSettings.field && fieldValue !== undefined) {
+            if (renderSettings.mode === 'category') {
+              // 分类渲染
+              const colorSetting = renderSettings.categoryColors[fieldValue];
+              if (colorSetting) {
+                color = window.Cesium.Color.fromCssColorString(colorSetting.value)
+                  .withAlpha(colorSetting.alpha);
+                colorApplied = true;
+              }
+            }
           }
-
-          // 设置高度
-          const finalHeight = baseHeight + (propertyHeight * heightScale)
+          
+          // 如果无法应用颜色，使用默认颜色
+          if (!colorApplied) {
+            color = window.Cesium.Color.GRAY.withAlpha(0.6);
+          } else {
+            colorAppliedCount++;
+          }
+          
+          // 应用颜色到实体
+          entity.polygon.material = color;
+          
+          // 设置多边形高度
+          const finalHeight = baseHeight + (propertyHeight * heightScale);
           if (finalHeight > 0) {
-            entity.polygon.extrudedHeight = finalHeight
-            entity.polygon.extrudedHeightReference = window.Cesium.HeightReference.RELATIVE_TO_GROUND
+            entity.polygon.extrudedHeight = finalHeight;
+            entity.polygon.extrudedHeightReference = window.Cesium.HeightReference.RELATIVE_TO_GROUND;
+          } else {
+            entity.polygon.extrudedHeight = undefined;
           }
-
-          // 设置轮廓
-          entity.polygon.outline = true
-          entity.polygon.outlineColor = contrastColor
-          entity.polygon.outlineWidth = 2
-
-        } else if (entity.polyline) {
-          // 线要素使用对比色
-          entity.polyline.material = contrastColor
-          entity.polyline.width = 3
-          if (propertyHeight > 0) {
-            entity.polyline.clampToGround = false
-            entity.polyline.height = propertyHeight * heightScale
-          }
-
-        } else if (entity.point) {
-          // 点要素使用对比色
-          entity.point.color = contrastColor
-          entity.point.pixelSize = 12
-          entity.point.outlineColor = window.Cesium.Color.WHITE
-          entity.point.outlineWidth = 2
-          if (propertyHeight > 0) {
-            entity.point.heightReference = window.Cesium.HeightReference.RELATIVE_TO_GROUND
-            entity.position = window.Cesium.Cartesian3.fromDegrees(
-              entity.position.getValue().x,
-              entity.position.getValue().y,
-              propertyHeight * heightScale
-            )
+          
+          // 更新标签文本
+          if (name && entity._labelEntity) {
+            let labelText = `${name}`;
+            if (renderSettings.field && fieldValue !== undefined) {
+              labelText += `\n${renderSettings.field}: ${fieldValue}`;
+            }
+            if (finalHeight > 0) {
+              labelText += `\n高度: ${finalHeight.toFixed(1)}米`;
+            }
+            entity._labelEntity.label.text = labelText;
           }
         }
-
-        // 更新标注
-        if (name && entity._labelEntity) {
-          const finalHeight = baseHeight + (propertyHeight * heightScale)
-          entity._labelEntity.label.text = `${name}\n高度: ${finalHeight.toFixed(1)}米${type ? '\n类型: ' + type : ''}`
-        }
-      })
+      });
+      
+      console.log(`样式应用完成: 处理了 ${processedCount} 个实体，应用颜色 ${colorAppliedCount} 次`);
     },
     updateGeoJSONStyle(styleSettings) {
       if (!this.dataSources.geojson) return
       
+      // 清除任何残留的图例
+      this.clearLegend();
+      
       console.log('Updating GeoJSON style with:', styleSettings)
       
-      const { colors, height } = styleSettings
-      const baseHeight = height?.baseHeight || 0
-      const heightScale = height?.heightScale || 1
-
-      this.dataSources.geojson.entities.values.forEach(entity => {
-        if (!entity.properties) return
-
-        const type = entity.properties.type?._value?.toLowerCase()
-        const propertyHeight = entity.properties.height?._value || 0
-        const name = entity.properties.name?._value
-        const colorSetting = colors?.[type]
-
-        if (entity.polygon) {
-          // 更新颜色
-          if (colorSetting) {
-            const color = window.Cesium.Color.fromCssColorString(colorSetting.value)
-              .withAlpha(colorSetting.alpha)
-            entity.polygon.material = color
-          }
-
-          // 更新高度
-          const finalHeight = baseHeight + (propertyHeight * heightScale)
-          entity.polygon.extrudedHeight = finalHeight > 0 ? finalHeight : undefined
-          
-          // 确保设置了正确的高度参考
-          entity.polygon.extrudedHeightReference = window.Cesium.HeightReference.RELATIVE_TO_GROUND
-
-          // 更新标注
-          if (name) {
-            // 计算多边形中心点
-            const positions = entity.polygon.hierarchy.getValue().positions
-            const centerCartesian = window.Cesium.BoundingSphere.fromPoints(positions).center
-            
-            // 如果已存在标注则更新，否则创建新标注
-            if (!entity.label) {
-              entity.label = {
-                text: `${name}\n高度: ${finalHeight.toFixed(1)}米`,
-                font: '14px sans-serif',
-                fillColor: window.Cesium.Color.WHITE,
-                outlineColor: window.Cesium.Color.BLACK,
-                outlineWidth: 2,
-                style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
-                verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
-                pixelOffset: new window.Cesium.Cartesian2(0, -finalHeight),
-                heightReference: window.Cesium.HeightReference.RELATIVE_TO_GROUND,
-                disableDepthTestDistance: Number.POSITIVE_INFINITY,
-                position: centerCartesian
-              }
-            } else {
-              // 更新现有标注
-              entity.label.text = `${name}\n高度: ${finalHeight.toFixed(1)}米`
-              entity.label.pixelOffset = new window.Cesium.Cartesian2(0, -finalHeight)
-              entity.label.position = centerCartesian
+      // 应用分色渲染
+      this.applyGeoJSONStyle(this.dataSources.geojson, styleSettings)
+      
+      // 当高度改变时，调整视图以适应新的高度
+      const { height } = styleSettings
+      if (height && (height.baseHeight > 0 || height.heightScale > 1)) {
+        // 使用轻微延迟，确保样式应用后再调整视图
+        setTimeout(() => {
+          if (this.viewer && this.dataSources.geojson) {
+            try {
+              // 尝试调整视图
+              this.viewer.flyTo(this.dataSources.geojson, {
+                duration: 1,
+                offset: new window.Cesium.HeadingPitchRange(
+                  0,
+                  window.Cesium.Math.toRadians(-35), // 稍微倾斜的视角以便查看高度
+                  0
+                )
+              }).catch(error => {
+                console.error('更新样式后调整视图失败:', error);
+              });
+            } catch (error) {
+              console.error('更新样式后调整视图出错:', error);
             }
           }
-        }
-      })
+        }, 300); // 短暂延迟，确保样式完全应用
+      }
     },
     async loadGITF(modelPath, modelProperties = null) {
       if (!this.viewer || !this.isViewerReady) {
@@ -1268,10 +1278,103 @@ export default {
       ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
       return ret;
     },
+
+    // 处理GeoJSON视图更新
+    handleUpdateGeoJSONView() {
+      if (!this.viewer || !this.dataSources.geojson) {
+        console.error('无法更新GeoJSON视图：viewer或数据源不存在');
+        return;
+      }
+      
+      console.log('更新GeoJSON视图...');
+      
+      // 检查datasource是否有实体
+      const entities = this.dataSources.geojson.entities.values;
+      if (entities.length === 0) {
+        console.warn('GeoJSON数据源没有实体，无法调整视图');
+        return;
+      }
+      
+      try {
+        // 创建一个临时实体集合，用于zoomTo
+        const entityCollection = new window.Cesium.EntityCollection();
+        entities.forEach(entity => {
+          if (entity.polygon) {
+            entityCollection.add(entity);
+          }
+        });
+        
+        if (entityCollection.values.length === 0) {
+          console.warn('未找到多边形实体，尝试使用所有实体');
+          // 如果没有多边形实体，使用所有实体
+          this.viewer.flyTo(this.dataSources.geojson, {
+            duration: 1.5,
+            offset: new window.Cesium.HeadingPitchRange(
+              0, 
+              window.Cesium.Math.toRadians(-40),
+              0
+            )
+          }).catch(error => {
+            console.error('飞行到GeoJSON数据失败，尝试使用zoomTo:', error);
+            this.viewer.zoomTo(this.dataSources.geojson);
+          });
+        } else {
+          console.log(`使用 ${entityCollection.values.length} 个多边形实体进行视图定位`);
+          // 先尝试使用flyTo
+          this.viewer.flyTo(entityCollection, {
+            duration: 1.5,
+            offset: new window.Cesium.HeadingPitchRange(
+              0, 
+              window.Cesium.Math.toRadians(-40),
+              0
+            )
+          }).catch(error => {
+            console.error('使用flyTo失败，尝试使用zoomTo:', error);
+            // 如果flyTo失败，使用zoomTo
+            this.viewer.zoomTo(entityCollection);
+          });
+        }
+      } catch (error) {
+        console.error('相机定位失败:', error);
+        // 最后的尝试：使用直接更改相机位置
+        try {
+          // 获取第一个实体的位置作为备选
+          const firstEntity = entities[0];
+          if (firstEntity && firstEntity.polygon) {
+            const positions = firstEntity.polygon.hierarchy.getValue().positions;
+            const center = window.Cesium.BoundingSphere.fromPoints(positions).center;
+            const cartographic = window.Cesium.Cartographic.fromCartesian(center);
+            const longitude = window.Cesium.Math.toDegrees(cartographic.longitude);
+            const latitude = window.Cesium.Math.toDegrees(cartographic.latitude);
+            
+            // 设置相机位置
+            this.viewer.camera.flyTo({
+              destination: window.Cesium.Cartesian3.fromDegrees(longitude, latitude, 2000),
+              orientation: {
+                heading: 0,
+                pitch: window.Cesium.Math.toRadians(-50),
+                roll: 0
+              }
+            });
+          }
+        } catch (error2) {
+          console.error('所有相机定位方法都失败:', error2);
+        }
+      }
+    },
+
+    // 清除图例元素
+    clearLegend() {
+      const oldLegend = document.querySelector('.geojson-legend');
+      if (oldLegend) {
+        oldLegend.remove();
+        console.log('已清除GeoJSON图例');
+      }
+    },
   },
   mounted() {
-    // 移除旧的初始化代码，因为现在使用事件处理
-    // this.$nextTick(() => { ... })
+    // 清除任何残留的图例
+    this.clearLegend();
   },
   beforeDestroy() {
     if (this.viewer) {
@@ -1307,6 +1410,7 @@ export default {
         @coordinate-picking-change="handleCoordinatePickingChange"
         @fly-to-location="handleFlyToLocation"
         @update-geojson-style="updateGeoJSONStyle"
+        @update-geojson-view="handleUpdateGeoJSONView"
         @run-path-analysis="handlePathAnalysis"
         @run-visibility-analysis="handleVisibilityAnalysis"
         @run-viewshed-analysis="handleViewshedAnalysis"
