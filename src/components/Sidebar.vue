@@ -121,7 +121,7 @@
       <!-- 影像图层悬浮窗 -->
       <div class="floating-window" v-show="isImageryOpen" :class="{'minimized': isImageryMinimized}" :style="{ left: imageryPosition.x + 'px', top: imageryPosition.y + 'px' }">
         <div class="window-header" @mousedown="startDrag($event, 'imagery')">
-          <span class="window-title">影像图层</span>
+          <span class="window-title">🛰️影像图层</span>
           <div class="window-controls">
             <button class="minimize-button" @click.stop="toggleMinimize('imagery', $event)">⌄</button>
             <button class="close-button" @click="toggleDrawer('imagery')">×</button>
@@ -160,7 +160,7 @@
       <!-- 地形悬浮窗 -->
       <div class="floating-window" v-show="isTerrainOpen" :class="{'minimized': isTerrainMinimized}" :style="{ left: terrainPosition.x + 'px', top: terrainPosition.y + 'px' }">
         <div class="window-header" @mousedown="startDrag($event, 'terrain')">
-          <span class="window-title">地形</span>
+          <span class="window-title">⛰️地形</span>
           <div class="window-controls">
             <button class="minimize-button" @click.stop="toggleMinimize('terrain', $event)">⌄</button>
             <button class="close-button" @click="toggleDrawer('terrain')">×</button>
@@ -185,7 +185,7 @@
       <!-- 数据加载悬浮窗 -->
       <div class="floating-window" v-show="isDataOpen" :class="{'minimized': isDataMinimized}" :style="{ left: dataPosition.x + 'px', top: dataPosition.y + 'px' }">
         <div class="window-header" @mousedown="startDrag($event, 'data')">
-          <span class="window-title">数据加载</span>
+          <span class="window-title">📊数据加载</span>
           <div class="window-controls">
             <button class="minimize-button" @click.stop="toggleMinimize('data', $event)">⌄</button>
             <button class="close-button" @click="toggleDrawer('data')">×</button>
@@ -305,7 +305,7 @@
       <!-- 空间分析悬浮窗 -->
       <div class="floating-window" v-show="isAnalysisOpen" :class="{'minimized': isAnalysisMinimized}" :style="{ left: analysisPosition.x + 'px', top: analysisPosition.y + 'px' }">
         <div class="window-header" @mousedown="startDrag($event, 'analysis')">
-          <span class="window-title">空间分析</span>
+          <span class="window-title">📐空间分析</span>
           <div class="window-controls">
             <button class="minimize-button" @click.stop="toggleMinimize('analysis', $event)">⌄</button>
             <button class="close-button" @click="toggleDrawer('analysis')">×</button>
