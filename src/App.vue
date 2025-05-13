@@ -63,19 +63,36 @@ export default {
       this.$refs.cesiumViewer.toggle3D()
     },
     handleSwitchImagery(type) {
-      switch (type) {
-        case 'default':
-          this.$refs.cesiumViewer.switchImagery('default')
-          break
-        case 'arcgis':
-          this.$refs.cesiumViewer.loadArcGISImagery()
-          break
-        case 'tianditu':
-          this.$refs.cesiumViewer.loadTiandituImagery()
-          break
-        case 'amap':
-          this.$refs.cesiumViewer.loadAmapImagery()
-          break
+      console.log(`请求切换到图层: ${type}`);
+      
+      try {
+        if (!this.$refs.cesiumViewer) {
+          console.error('CesiumViewer组件未就绪，无法切换图层');
+          return;
+        }
+        
+        switch (type) {
+          case 'default':
+            console.log('切换到默认Cesium影像');
+            this.$refs.cesiumViewer.switchImagery('default');
+            break;
+          case 'tianditu':
+            console.log('请求加载天地图影像');
+            this.$refs.cesiumViewer.loadTiandituImagery();
+            break;
+          case 'amap':
+            console.log('请求加载高德地图影像');
+            this.$refs.cesiumViewer.loadAmapImagery();
+            break;
+          default:
+            console.warn(`未知的图层类型: ${type}`);
+        }
+        
+        // 更新当前图层类型
+        this.currentImagery = type;
+        console.log(`当前图层已更新为: ${this.currentImagery}`);
+      } catch (error) {
+        console.error(`切换图层时发生错误: ${error.message}`, error);
       }
     },
     handleSwitchTerrain(type) {
@@ -572,7 +589,7 @@ export default {
             latitude = transformedCoords.latitude;
             console.log('转换为高德坐标系(GCJ02):', transformedCoords);
           } else {
-            // 如果是其他地图（Cesium、ArcGIS、天地图），使用WGS84坐标
+            // 如果是其他地图（Cesium、天地图），使用WGS84坐标
             console.log('使用WGS84坐标系');
           }
 

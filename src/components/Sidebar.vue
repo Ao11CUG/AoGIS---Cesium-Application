@@ -128,7 +128,7 @@
           </div>
         </div>
         <div class="window-content" v-show="!isImageryMinimized">
-          <div class="control-group">
+          <div class="control-group imagery-control-group">
             <button 
               class="control-button" 
               @click="$emit('switch-imagery', 'default')"
@@ -136,14 +136,6 @@
             >
               <span class="icon">🛰️</span>
               <span class="text">Cesium</span>
-            </button>
-            <button 
-              class="control-button" 
-              @click="$emit('switch-imagery', 'arcgis')"
-              :class="{ active: currentImagery === 'arcgis' }"
-            >
-              <span class="icon">🗺️</span>
-              <span class="text">ArcGIS</span>
             </button>
             <button 
               class="control-button" 
@@ -2466,5 +2458,46 @@ export default {
 }
 
 .color-input {
+}
+
+.imagery-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background-color: rgba(52, 73, 94, 0.2);
+  padding: 6px;
+  border-radius: 3px;
+  margin-top: 0;
+}
+
+.imagery-control-group button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background-color: rgba(52, 73, 94, 0.6);
+  border: none;
+  border-radius: 4px;
+  color: #ecf0f1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.85em;
+}
+
+.imagery-control-group button:hover {
+  background-color: rgba(52, 152, 219, 0.8);
+  transform: translateX(2px);
+}
+
+.imagery-control-group button .icon {
+  margin-right: 8px;
+  font-size: 1em;
+}
+
+.imagery-control-group button .text {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
 }
 </style> 

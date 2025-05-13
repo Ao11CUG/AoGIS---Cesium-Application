@@ -14,7 +14,6 @@ export default {
       // 影像图层列表
       imageryLayers: {
         default: null,
-        arcgis: null,
         tianditu: null,
         amap: null
       },
@@ -74,47 +73,46 @@ export default {
     // 初始化默认影像图层
     initDefaultImagery() {
       try {
+        console.log('初始化默认Cesium影像...');
         // 默认使用 Cesium World Imagery
         const imageryProvider = new window.Cesium.IonImageryProvider({
           assetId: 3845,
           accessToken: window.Cesium.Ion.defaultAccessToken
-        })
+        });
         
         if (!imageryProvider) {
-          console.error('Failed to create imagery provider')
-          return
+          console.error('创建影像提供者失败');
+          return;
         }
 
         // 检查 readyPromise 是否存在
         if (imageryProvider.readyPromise) {
           imageryProvider.readyPromise
             .then(() => {
-              console.log('Imagery provider ready')
-              this.imageryLayers.default = this.viewer.imageryLayers.addImageryProvider(imageryProvider)
+              console.log('默认影像提供者已就绪');
+              this.imageryLayers.default = this.viewer.imageryLayers.addImageryProvider(imageryProvider);
+              this.imageryLayers.default.show = true;
+              console.log('默认影像图层已添加并显示');
+              
+              // 通知父组件默认图层已加载
+              this.$emit('update:currentImagery', 'default');
             })
             .catch(error => {
-              console.error('Error loading Cesium World Imagery:', error)
-            })
+              console.error('加载Cesium影像时出错:', error);
+            });
         } else {
           // 如果没有 readyPromise，直接添加图层
-          console.log('Adding imagery provider without readyPromise')
-          this.imageryLayers.default = this.viewer.imageryLayers.addImageryProvider(imageryProvider)
+          console.log('影像提供者无readyPromise，直接添加图层');
+          this.imageryLayers.default = this.viewer.imageryLayers.addImageryProvider(imageryProvider);
+          this.imageryLayers.default.show = true;
+          console.log('默认影像图层已直接添加并显示');
+          
+          // 通知父组件默认图层已加载
+          this.$emit('update:currentImagery', 'default');
         }
       } catch (error) {
-        console.error('Error in initDefaultImagery:', error)
+        console.error('初始化默认影像图层时出错:', error);
       }
-    },
-
-    // 加载 ArcGIS 影像
-    loadArcGISImagery() {
-      if (!this.imageryLayers.arcgis) {
-        this.imageryLayers.arcgis = this.viewer.imageryLayers.addImageryProvider(
-          new window.Cesium.ArcGisMapServerImageryProvider({
-            url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
-          })
-        )
-      }
-      this.switchImagery('arcgis')
     },
 
     // 加载天地图影像
@@ -152,23 +150,63 @@ export default {
 
     // 切换影像图层
     switchImagery(type) {
-      // 隐藏所有图层
-      Object.keys(this.imageryLayers).forEach(key => {
-        if (this.imageryLayers[key]) {
-          this.imageryLayers[key].show = false;
+      console.log(`切换到图层类型: ${type}`);
+      
+      try {
+        // 记录图层切换前的状态
+        Object.keys(this.imageryLayers).forEach(key => {
+          if (this.imageryLayers[key]) {
+            console.log(`图层 ${key} 切换前状态: ${this.imageryLayers[key].show}`);
+          } else {
+            console.log(`图层 ${key} 不存在`);
+          }
+        });
+        
+        // 隐藏所有图层
+        Object.keys(this.imageryLayers).forEach(key => {
+          if (this.imageryLayers[key]) {
+            this.imageryLayers[key].show = false;
+            console.log(`图层 ${key} 已隐藏`);
+          }
+        });
+        
+        // 显示选中的图层
+        if (this.imageryLayers[type]) {
+          this.imageryLayers[type].show = true;
+          console.log(`图层 ${type} 已显示`);
+          
+          // 确保选中的图层在最顶层
+          const selectedLayer = this.imageryLayers[type];
+          const layerIndex = this.viewer.imageryLayers.indexOf(selectedLayer);
+          if (layerIndex >= 0) {
+            // 如果图层不在最顶层，则将其移到最顶层
+            const topIndex = this.viewer.imageryLayers.length - 1;
+            if (layerIndex < topIndex) {
+              this.viewer.imageryLayers.raise(selectedLayer, topIndex - layerIndex);
+              console.log(`图层 ${type} 已提升到顶层`);
+            }
+          }
+        } else if (type === 'amap') {
+          // 如果是高德地图且尚未加载，则加载它
+          console.log('高德地图未加载，正在加载...');
+          this.loadAmapImagery();
+          return; // loadAmapImagery内部会调用switchImagery，这里直接返回
+        } else {
+          console.warn(`请求的图层类型 ${type} 不存在`);
         }
-      });
-      
-      // 显示选中的图层
-      if (this.imageryLayers[type]) {
-        this.imageryLayers[type].show = true;
-      } else if (type === 'amap') {
-        // 如果是高德地图且尚未加载，则加载它
-        this.loadAmapImagery();
+        
+        // 更新当前底图类型
+        this.$emit('update:currentImagery', type);
+        
+        // 记录图层切换后的状态
+        Object.keys(this.imageryLayers).forEach(key => {
+          if (this.imageryLayers[key]) {
+            console.log(`图层 ${key} 切换后状态: ${this.imageryLayers[key].show}`);
+          }
+        });
+      } catch (error) {
+        console.error('切换图层时出错:', error);
       }
-      
-      // 更新当前底图类型
-      this.$emit('update:currentImagery', type);
     },
 
     // 初始化地形
