@@ -7,7 +7,6 @@
         <!-- 设施寻路面板 -->
         <div class="facility-panel">
           <h3>设施寻路</h3>
-          <label style="color: blue">[请先切换至高德地图]</label>
           <div class="param-item">
             <label>设施名称</label>
             <input 

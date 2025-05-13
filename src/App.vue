@@ -106,33 +106,430 @@ export default {
     },
 
     // 开始路径规划分析
-    async startPathAnalysis() {
-      this.currentAnalysis = 'path'
+    async handlePathAnalysis(params) {
+      try {
+        this.currentAnalysis = 'path';
+        
+        // 清除现有分析结果
+        this.clearAnalysisResults();
+        
+        // 创建起点标记
+        const startPoint = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(params.startLon, params.startLat),
+          point: {
+            pixelSize: 12,
+            color: window.Cesium.Color.GREEN,
+            outlineColor: window.Cesium.Color.WHITE,
+            outlineWidth: 2
+          },
+          label: {
+            text: '起点',
+            font: '14px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new window.Cesium.Cartesian2(0, -10)
+          }
+        });
+        
+        // 创建终点标记
+        const endPoint = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(params.endLon, params.endLat),
+          point: {
+            pixelSize: 12,
+            color: window.Cesium.Color.RED,
+            outlineColor: window.Cesium.Color.WHITE,
+            outlineWidth: 2
+          },
+          label: {
+            text: '终点',
+            font: '14px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new window.Cesium.Cartesian2(0, -10)
+          }
+        });
+        
+        this.analysisEntities.push(startPoint, endPoint);
+        
+        try {
+          // 获取路径规划结果
+          const routeResult = await this.getRoutePath(
+            params.startLon,
+            params.startLat,
+            params.endLon,
+            params.endLat
+          );
+          
+          // 创建路径实体
+          const pathEntity = this.viewer.entities.add({
+            polyline: {
+              positions: routeResult.points,
+              width: 6,
+              material: new window.Cesium.PolylineGlowMaterialProperty({
+                glowPower: 0.3,
+                taperPower: 0.5,
+                color: window.Cesium.Color.CORNFLOWERBLUE
+              })
+            }
+          });
+          
+          // 创建距离标签
+          const midPoint = routeResult.points[Math.floor(routeResult.points.length / 2)];
+          const distanceLabel = this.viewer.entities.add({
+            position: midPoint,
+            label: {
+              text: `路径距离: ${(routeResult.distance / 1000).toFixed(2)}公里`,
+              font: '16px sans-serif',
+              fillColor: window.Cesium.Color.WHITE,
+              style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+              outlineWidth: 2,
+              verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+              pixelOffset: new window.Cesium.Cartesian2(0, -10),
+              showBackground: true,
+              backgroundColor: window.Cesium.Color.BLACK.withAlpha(0.7)
+            }
+          });
+          
+          this.analysisEntities.push(pathEntity, distanceLabel);
+          
+          // 调整视图以显示整个路径
+          this.viewer.zoomTo(this.viewer.entities);
+          
+        } catch (error) {
+          console.error('获取路径规划失败:', error);
+          
+          // 如果路径获取失败，使用直线连接
+          const directPathEntity = this.viewer.entities.add({
+            polyline: {
+              positions: [
+                window.Cesium.Cartesian3.fromDegrees(params.startLon, params.startLat),
+                window.Cesium.Cartesian3.fromDegrees(params.endLon, params.endLat)
+              ],
+              width: 3,
+              material: window.Cesium.Color.RED.withAlpha(0.8)
+            }
+          });
+          
+          this.analysisEntities.push(directPathEntity);
+          this.viewer.zoomTo(this.viewer.entities);
+          
+          alert(error.message || '路径规划失败，已使用直线连接');
+        }
+        
+      } catch (error) {
+        console.error('路径分析失败:', error);
+        alert('路径分析失败: ' + error.message);
+      }
     },
 
     // 开始通视分析
-    async startVisibilityAnalysis() {
-      this.currentAnalysis = 'visibility'
+    async handleVisibilityAnalysis(params) {
+      try {
+        this.currentAnalysis = 'visibility';
+        
+        // 清除现有分析结果
+        this.clearAnalysisResults();
+        
+        // 创建观察点
+        const observerPoint = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(
+            params.observerLon, 
+            params.observerLat, 
+            params.observerHeight
+          ),
+          point: {
+            pixelSize: 12,
+            color: window.Cesium.Color.BLUE,
+            outlineColor: window.Cesium.Color.WHITE,
+            outlineWidth: 2
+          },
+          label: {
+            text: '观察点',
+            font: '14px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new window.Cesium.Cartesian2(0, -10)
+          }
+        });
+        
+        // 创建目标点
+        const targetPoint = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(
+            params.targetLon, 
+            params.targetLat, 
+            params.targetHeight
+          ),
+          point: {
+            pixelSize: 12,
+            color: window.Cesium.Color.YELLOW,
+            outlineColor: window.Cesium.Color.WHITE,
+            outlineWidth: 2
+          },
+          label: {
+            text: '目标点',
+            font: '14px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new window.Cesium.Cartesian2(0, -10)
+          }
+        });
+        
+        // 创建连线
+        const lineEntity = this.viewer.entities.add({
+          polyline: {
+            positions: [
+              window.Cesium.Cartesian3.fromDegrees(params.observerLon, params.observerLat, params.observerHeight),
+              window.Cesium.Cartesian3.fromDegrees(params.targetLon, params.targetLat, params.targetHeight)
+            ],
+            width: 2,
+            material: window.Cesium.Color.RED.withAlpha(0.7)
+          }
+        });
+        
+        this.analysisEntities.push(observerPoint, targetPoint, lineEntity);
+        
+        // 检查通视性
+        const result = this.checkVisibility(
+          window.Cesium.Cartesian3.fromDegrees(params.observerLon, params.observerLat, params.observerHeight),
+          window.Cesium.Cartesian3.fromDegrees(params.targetLon, params.targetLat, params.targetHeight)
+        );
+        
+        // 创建结果标签
+        const resultEntity = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(
+            (params.observerLon + params.targetLon) / 2,
+            (params.observerLat + params.targetLat) / 2,
+            Math.max(params.observerHeight, params.targetHeight) + 10
+          ),
+          label: {
+            text: `通视分析结果: ${result.isVisible ? '可见' : '不可见'}
+距离: ${(result.distance / 1000).toFixed(2)}公里
+高度差: ${result.heightDifference.toFixed(2)}米
+坡度: ${result.slope.toFixed(2)}°`,
+            font: '16px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.CENTER,
+            horizontalOrigin: window.Cesium.HorizontalOrigin.CENTER,
+            showBackground: true,
+            backgroundColor: window.Cesium.Color.BLACK.withAlpha(0.7)
+          }
+        });
+        
+        this.analysisEntities.push(resultEntity);
+        
+        // 调整视图以显示分析结果
+        this.viewer.zoomTo(this.viewer.entities);
+        
+      } catch (error) {
+        console.error('通视分析失败:', error);
+        alert('通视分析失败: ' + error.message);
+      }
     },
 
     // 开始可视域分析
-    async startViewshedAnalysis() {
-      this.currentAnalysis = 'viewshed'
+    async handleViewshedAnalysis(params) {
+      try {
+        this.currentAnalysis = 'viewshed';
+        
+        // 清除现有分析结果
+        this.clearAnalysisResults();
+        
+        // 创建视点
+        const viewerEntity = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(
+            params.viewerLon,
+            params.viewerLat,
+            params.viewerHeight
+          ),
+          point: {
+            pixelSize: 12,
+            color: window.Cesium.Color.RED,
+            outlineColor: window.Cesium.Color.WHITE,
+            outlineWidth: 2
+          },
+          label: {
+            text: '视点',
+            font: '14px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new window.Cesium.Cartesian2(0, -10)
+          }
+        });
+        
+        this.analysisEntities.push(viewerEntity);
+        
+        // 计算可视域多边形顶点
+        const positions = this.calculateViewshedPoints(
+          params.viewerLon,
+          params.viewerLat,
+          params.viewerHeight,
+          params.radius,
+          params.horizontalAngle,
+          params.verticalAngle
+        );
+        
+        // 创建可视域范围
+        const viewshedEntity = this.viewer.entities.add({
+          polygon: {
+            hierarchy: new window.Cesium.PolygonHierarchy(positions),
+            material: window.Cesium.Color.GREEN.withAlpha(0.3),
+            outline: true,
+            outlineColor: window.Cesium.Color.GREEN,
+            outlineWidth: 2
+          }
+        });
+        
+        this.analysisEntities.push(viewshedEntity);
+        
+        // 创建说明标签
+        const infoEntity = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(
+            params.viewerLon,
+            params.viewerLat,
+            params.viewerHeight + 10
+          ),
+          label: {
+            text: `可视域分析\n水平角度: ${params.horizontalAngle}°\n垂直角度: ${params.verticalAngle}°\n可视距离: ${params.radius}米`,
+            font: '16px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.TOP,
+            pixelOffset: new window.Cesium.Cartesian2(0, 10),
+            showBackground: true,
+            backgroundColor: window.Cesium.Color.BLACK.withAlpha(0.7)
+          }
+        });
+        
+        this.analysisEntities.push(infoEntity);
+        
+        // 调整视图以显示可视域
+        this.viewer.zoomTo(this.viewer.entities);
+        
+      } catch (error) {
+        console.error('可视域分析失败:', error);
+        alert('可视域分析失败: ' + error.message);
+      }
     },
 
     // 开始缓冲区分析
-    async startBufferAnalysis() {
-      this.currentAnalysis = 'buffer'
+    async handleBufferAnalysis(params) {
+      try {
+        this.currentAnalysis = 'buffer';
+        
+        // 清除现有分析结果
+        this.clearAnalysisResults();
+        
+        // 创建中心点
+        const centerPoint = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(params.centerLon, params.centerLat),
+          point: {
+            pixelSize: 12,
+            color: window.Cesium.Color.RED,
+            outlineColor: window.Cesium.Color.WHITE,
+            outlineWidth: 2
+          },
+          label: {
+            text: '中心点',
+            font: '14px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new window.Cesium.Cartesian2(0, -10)
+          }
+        });
+        
+        this.analysisEntities.push(centerPoint);
+        
+        // 创建缓冲区
+        const bufferEntity = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(params.centerLon, params.centerLat),
+          ellipse: {
+            semiMinorAxis: params.radius,
+            semiMajorAxis: params.radius,
+            material: window.Cesium.Color.GREEN.withAlpha(0.3),
+            outline: true,
+            outlineColor: window.Cesium.Color.GREEN,
+            outlineWidth: 2
+          }
+        });
+        
+        this.analysisEntities.push(bufferEntity);
+        
+        // 创建说明标签
+        const infoEntity = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(params.centerLon, params.centerLat),
+          label: {
+            text: `缓冲区半径: ${params.radius}米`,
+            font: '16px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.TOP,
+            pixelOffset: new window.Cesium.Cartesian2(0, 10),
+            showBackground: true,
+            backgroundColor: window.Cesium.Color.BLACK.withAlpha(0.7)
+          }
+        });
+        
+        this.analysisEntities.push(infoEntity);
+        
+        // 调整视图以显示缓冲区
+        this.viewer.zoomTo(this.viewer.entities);
+        
+      } catch (error) {
+        console.error('缓冲区分析失败:', error);
+        alert('缓冲区分析失败: ' + error.message);
+      }
     },
 
     // 获取路径规划结果
     async getRoutePath(startLon, startLat, endLon, endLat) {
       try {
+        // 根据当前底图类型进行坐标转换
+        let originLon = startLon;
+        let originLat = startLat;
+        let destLon = endLon;
+        let destLat = endLat;
+
+        // 如果当前底图不是高德地图，需要将WGS84坐标转换为GCJ02
+        if (this.currentImagery !== 'amap') {
+          // 转换起点坐标
+          const originConverted = this.transformCoordinates(startLon, startLat, 'WGS84', 'GCJ02');
+          originLon = originConverted.longitude;
+          originLat = originConverted.latitude;
+          
+          // 转换终点坐标
+          const destConverted = this.transformCoordinates(endLon, endLat, 'WGS84', 'GCJ02');
+          destLon = destConverted.longitude;
+          destLat = destConverted.latitude;
+          
+          console.log('坐标已从WGS84转换为GCJ02:',
+            `起点: (${startLon}, ${startLat}) -> (${originLon}, ${originLat})`,
+            `终点: (${endLon}, ${endLat}) -> (${destLon}, ${destLat})`
+          );
+        } else {
+          console.log('使用原始GCJ02坐标调用高德API');
+        }
+
         // 构建请求 URL
         const url = new URL('https://restapi.amap.com/v5/direction/walking');
         url.searchParams.append('key', this.amapConfig.key);
-        url.searchParams.append('origin', `${startLon},${startLat}`);
-        url.searchParams.append('destination', `${endLon},${endLat}`);
+        url.searchParams.append('origin', `${originLon},${originLat}`);
+        url.searchParams.append('destination', `${destLon},${destLat}`);
         url.searchParams.append('show_fields', 'polyline');
 
         console.log('路径规划 API 请求:', url.toString());
@@ -161,9 +558,39 @@ export default {
           if (step.polyline) {
             const points = step.polyline.split(';').map(point => {
               const [lng, lat] = point.split(',').map(Number);
-              return window.Cesium.Cartesian3.fromDegrees(lng, lat);
+              
+              // 高德返回的坐标是GCJ02，如果当前底图不是高德地图，需要转换回WGS84显示
+              let displayLng = lng;
+              let displayLat = lat;
+              
+              if (this.currentImagery !== 'amap') {
+                const wgs84Point = this.transformCoordinates(lng, lat, 'GCJ02', 'WGS84');
+                displayLng = wgs84Point.longitude;
+                displayLat = wgs84Point.latitude;
+              }
+              
+              return window.Cesium.Cartesian3.fromDegrees(displayLng, displayLat);
             });
             allPoints.push(...points);
+          }
+        }
+
+        // 检查是否需要添加终点连接
+        // 获取目标点（终点）的Cesium坐标 - 使用经过相同转换的终点坐标
+        const targetPoint = window.Cesium.Cartesian3.fromDegrees(endLon, endLat);
+
+        // 获取路径最后一个点
+        if (allPoints.length > 0) {
+          const lastPathPoint = allPoints[allPoints.length - 1];
+          
+          // 计算最后一个路径点与目标点的距离
+          const distance = window.Cesium.Cartesian3.distance(lastPathPoint, targetPoint);
+          
+          // 降低阈值并始终添加终点连接，以确保路径完整
+          // 如果距离超过2米，添加一个额外的点连接到目标点
+          if (distance > 2) {
+            console.log(`路径最后点与目标点距离: ${distance.toFixed(2)}米，添加连接点`);
+            allPoints.push(targetPoint);
           }
         }
 
@@ -175,285 +602,6 @@ export default {
         console.error('获取路径失败:', error);
         throw error;
       }
-    },
-
-    // 开始设施寻路分析
-    async handleFacilitySearch(params) {
-      if (!this.viewer) return;
-      
-      try {
-        // 清除之前的分析结果
-        this.clearAnalysisResults();
-
-        // 创建起点标记
-        const startPoint = this.viewer.entities.add({
-          position: window.Cesium.Cartesian3.fromDegrees(params.startLon, params.startLat),
-          point: {
-            pixelSize: 12,
-            color: window.Cesium.Color.GREEN,
-            outlineColor: window.Cesium.Color.WHITE,
-            outlineWidth: 2
-          },
-          label: {
-            text: '起点',
-            font: '14px sans-serif',
-            fillColor: window.Cesium.Color.WHITE,
-            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
-            outlineWidth: 2,
-            verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new window.Cesium.Cartesian2(0, -10)
-          }
-        });
-        this.analysisEntities.push(startPoint);
-
-        // 搜索附近设施
-        const facilities = await this.searchNearbyFacilities(params);
-        
-        if (!facilities || facilities.length === 0) {
-          this.$refs.sidebar.updateFacilityResults([]);
-          throw new Error('未找到符合条件的设施');
-        }
-
-        // 为每个设施创建标记和路径
-        for (const facility of facilities) {
-          // 创建设施点标记
-          const facilityEntity = this.viewer.entities.add({
-            position: window.Cesium.Cartesian3.fromDegrees(facility.longitude, facility.latitude),
-          point: {
-              pixelSize: 12,
-              color: window.Cesium.Color.fromCssColorString(facility.color),
-              outlineColor: window.Cesium.Color.WHITE,
-              outlineWidth: 2
-          },
-          label: {
-              text: `${facility.name}\n距离: ${(facility.distance / 1000).toFixed(2)}公里`,
-            font: '14px sans-serif',
-            fillColor: window.Cesium.Color.WHITE,
-            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
-              outlineWidth: 2,
-              verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
-              pixelOffset: new window.Cesium.Cartesian2(0, -10),
-            showBackground: true,
-            backgroundColor: window.Cesium.Color.BLACK.withAlpha(0.7)
-          }
-        });
-
-          try {
-            // 获取实际路径
-            const routeResult = await this.getRoutePath(
-              params.startLon,
-              params.startLat,
-              facility.longitude,
-              facility.latitude
-            );
-
-            // 创建路径实体
-            const pathEntity = this.viewer.entities.add({
-          polyline: {
-                positions: routeResult.points,
-                width: 10,
-                material: new window.Cesium.PolylineGlowMaterialProperty({
-                  glowPower: 0.3,
-                  taperPower: 0.5,
-                  color: window.Cesium.Color.fromCssColorString('#FF0000').withAlpha(1)
-                })
-              }
-            });
-
-            // 更新设施信息中的实际步行距离
-            facility.walkingDistance = routeResult.distance;
-
-            // 将实体添加到分析结果中
-            this.analysisEntities.push(facilityEntity, pathEntity);
-          } catch (error) {
-            console.error('获取路径失败:', error);
-            // 如果获取实际路径失败，使用直线连接
-            const pathEntity = this.viewer.entities.add({
-              polyline: {
-                positions: [
-                  window.Cesium.Cartesian3.fromDegrees(params.startLon, params.startLat),
-                  window.Cesium.Cartesian3.fromDegrees(facility.longitude, facility.latitude)
-                ],
-                width: 3,
-                material: window.Cesium.Color.fromCssColorString('#FF0000').withAlpha(0.8)
-              }
-            });
-            this.analysisEntities.push(facilityEntity, pathEntity);
-          }
-        }
-
-        // 更新搜索结果显示
-        this.$refs.sidebar.updateFacilityResults(facilities.map(f => ({
-          ...f,
-          walkingDistance: f.walkingDistance ? `步行距离: ${(f.walkingDistance / 1000).toFixed(2)}公里` : undefined
-        })));
-
-        // 调整视图以显示所有设施
-        this.viewer.zoomTo(this.viewer.entities);
-
-      } catch (error) {
-        console.error('处理设施搜索失败:', error);
-        alert(error.message || '处理设施搜索失败，请重试');
-      }
-    },
-
-    // 搜索附近设施
-    async searchNearbyFacilities(params) {
-      try {
-        console.log('开始搜索设施，参数:', params);
-
-        // 构建请求 URL
-        const url = new URL('https://restapi.amap.com/v5/place/around');
-        url.searchParams.append('key', this.amapConfig.key);
-        url.searchParams.append('keywords', params.facilityName);
-        url.searchParams.append('location', `${params.startLon},${params.startLat}`);
-        url.searchParams.append('radius', '10000'); // 10公里范围
-        url.searchParams.append('page_size', '20'); // 增加返回数量
-        url.searchParams.append('extensions', 'all'); // 返回完整的POI信息
-
-        console.log('高德地图 API 请求:', url.toString());
-
-        // 发送请求
-        const response = await fetch(url);
-        const data = await response.json();
-        console.log('API 返回数据:', data);
-
-        if (data.status !== '1') {
-          throw new Error(`API 请求失败: ${data.info}`);
-        }
-
-        if (!data.pois || data.pois.length === 0) {
-          console.log('未找到任何设施');
-          return [];
-        }
-
-        // 处理返回的数据
-        const facilities = data.pois.map(poi => {
-          try {
-            // 解析坐标
-            const [longitude, latitude] = poi.location.split(',').map(Number);
-            
-            // 获取设施类型
-            const type = this.getAmapFacilityType(poi.type);
-            
-            return {
-              name: poi.name,
-              type: type,
-              longitude: longitude,
-              latitude: latitude,
-              color: this.getFacilityColor(type),
-              distance: Number(poi.distance || 0),
-              address: poi.address || '暂无地址信息',
-              tel: poi.tel || '暂无电话信息',
-              businessArea: poi.business_area || '暂无商圈信息'
-            };
-      } catch (error) {
-            console.error('处理POI数据时出错:', error);
-            return null;
-          }
-        }).filter(Boolean);
-
-        console.log('处理后的设施数据:', facilities);
-
-        // 按距离排序
-        facilities.sort((a, b) => a.distance - b.distance);
-
-        // 返回指定数量的最近设施
-        const result = facilities.slice(0, params.count);
-        console.log('返回的最终结果:', result);
-
-        return result;
-
-      } catch (error) {
-        console.error('搜索设施失败:', error);
-        throw error;
-      }
-    },
-
-    // 获取高德地图设施类型
-    getAmapFacilityType(typeCode) {
-      const types = {
-        '090100': '医院',
-        '090101': '综合医院',
-        '090102': '专科医院',
-        '090200': '诊所',
-        '090300': '药店',
-        '090400': '急救中心',
-        '090500': '疾控中心'
-      };
-      
-      // 获取第一个匹配的类型代码
-      const mainType = typeCode.split('|')[0];
-      return types[mainType] || '医疗机构';
-    },
-
-    // 获取设施颜色
-    getFacilityColor(type) {
-      const colors = {
-        '医院': '#FF0000',
-        '综合医院': '#FF0000',
-        '专科医院': '#FF4500',
-        '诊所': '#FF6347',
-        '药店': '#FFA500',
-        '急救中心': '#FF0000',
-        '疾控中心': '#FF7F50',
-        '医疗机构': '#FFA07A'
-      };
-      return colors[type] || '#FF0000';
-    },
-
-    // 计算两点之间的距离（米）
-    calculateDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371000; // 地球半径（米）
-      const φ1 = this.toRadians(lat1);
-      const φ2 = this.toRadians(lat2);
-      const Δφ = this.toRadians(lat2 - lat1);
-      const Δλ = this.toRadians(lon2 - lon1);
-
-      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ/2) * Math.sin(Δλ/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-      return R * c;
-    },
-
-    // 角度转弧度
-    toRadians(degrees) {
-      return degrees * Math.PI / 180;
-    },
-
-    // 检查两点间是否通视
-    checkVisibility(observerCartesian, targetCartesian) {
-      const scene = this.viewer.scene;
-      
-      // 计算观察点和目标点之间的距离
-      const distance = window.Cesium.Cartesian3.distance(observerCartesian, targetCartesian);
-      
-      // 转换为地理坐标以计算高度差
-      const observerCartographic = window.Cesium.Cartographic.fromCartesian(observerCartesian);
-      const targetCartographic = window.Cesium.Cartographic.fromCartesian(targetCartesian);
-      const heightDifference = targetCartographic.height - observerCartographic.height;
-      
-      // 计算坡度（角度）
-      const slope = Math.atan2(heightDifference, distance) * (180 / Math.PI);
-      
-      // 使用地形检查是否有遮挡
-      const ray = new window.Cesium.Ray(observerCartesian, 
-        window.Cesium.Cartesian3.normalize(
-          window.Cesium.Cartesian3.subtract(targetCartesian, observerCartesian, new window.Cesium.Cartesian3()),
-          new window.Cesium.Cartesian3()
-        )
-      );
-      
-      const isVisible = !scene.globe.pick(ray, scene);
-      
-      return {
-        isVisible,
-        distance,
-        heightDifference,
-        slope
-      };
     },
 
     // 计算可视域多边形顶点
@@ -490,29 +638,6 @@ export default {
       const z = height + radius * Math.sin(radianVertical);
       
       return window.Cesium.Cartesian3.fromDegrees(x, y, z);
-    },
-
-    // 计算缓冲区圆的顶点
-    calculateBufferPoints(centerLon, centerLat, radius) {
-      const points = [];
-      const segments = 64;
-      const angleStep = 360 / segments;
-      
-      for (let i = 0; i <= segments; i++) {
-        const angle = i * angleStep;
-        const point = this.calculateBufferPoint(centerLon, centerLat, radius, angle);
-        points.push(point);
-      }
-      
-      return points;
-    },
-
-    // 计算缓冲区上的点
-    calculateBufferPoint(centerLon, centerLat, radius, angle) {
-      const radianAngle = angle * Math.PI / 180;
-      const x = centerLon + (radius * Math.cos(radianAngle)) / (111320 * Math.cos(centerLat * Math.PI / 180));
-      const y = centerLat + (radius * Math.sin(radianAngle)) / 111320;
-      return window.Cesium.Cartesian3.fromDegrees(x, y);
     },
 
     updateCameraParams() {
@@ -1387,6 +1512,336 @@ export default {
         oldLegend.remove();
         console.log('已清除GeoJSON图例');
       }
+    },
+
+    // 检查两点间是否通视
+    checkVisibility(observerCartesian, targetCartesian) {
+      const scene = this.viewer.scene;
+      
+      // 计算观察点和目标点之间的距离
+      const distance = window.Cesium.Cartesian3.distance(observerCartesian, targetCartesian);
+      
+      // 转换为地理坐标以计算高度差
+      const observerCartographic = window.Cesium.Cartographic.fromCartesian(observerCartesian);
+      const targetCartographic = window.Cesium.Cartographic.fromCartesian(targetCartesian);
+      const heightDifference = targetCartographic.height - observerCartographic.height;
+      
+      // 计算坡度（角度）
+      const slope = Math.atan2(heightDifference, distance) * (180 / Math.PI);
+      
+      // 使用地形检查是否有遮挡
+      const ray = new window.Cesium.Ray(observerCartesian, 
+        window.Cesium.Cartesian3.normalize(
+          window.Cesium.Cartesian3.subtract(targetCartesian, observerCartesian, new window.Cesium.Cartesian3()),
+          new window.Cesium.Cartesian3()
+        )
+      );
+      
+      const isVisible = !scene.globe.pick(ray, scene);
+      
+      return {
+        isVisible,
+        distance,
+        heightDifference,
+        slope
+      };
+    },
+
+    // 计算缓冲区圆的顶点
+    calculateBufferPoints(centerLon, centerLat, radius) {
+      const points = [];
+      const segments = 64;
+      const angleStep = 360 / segments;
+      
+      for (let i = 0; i <= segments; i++) {
+        const angle = i * angleStep;
+        const point = this.calculateBufferPoint(centerLon, centerLat, radius, angle);
+        points.push(point);
+      }
+      
+      return points;
+    },
+
+    // 计算缓冲区上的点
+    calculateBufferPoint(centerLon, centerLat, radius, angle) {
+      const radianAngle = angle * Math.PI / 180;
+      const x = centerLon + (radius * Math.cos(radianAngle)) / (111320 * Math.cos(centerLat * Math.PI / 180));
+      const y = centerLat + (radius * Math.sin(radianAngle)) / 111320;
+      return window.Cesium.Cartesian3.fromDegrees(x, y);
+    },
+
+    // 开始设施寻路分析
+    async handleFacilitySearch(params) {
+      if (!this.viewer) return;
+      
+      try {
+        // 清除之前的分析结果
+        this.clearAnalysisResults();
+
+        // 创建起点标记
+        const startPoint = this.viewer.entities.add({
+          position: window.Cesium.Cartesian3.fromDegrees(params.startLon, params.startLat),
+          point: {
+            pixelSize: 12,
+            color: window.Cesium.Color.GREEN,
+            outlineColor: window.Cesium.Color.WHITE,
+            outlineWidth: 2
+          },
+          label: {
+            text: '起点',
+            font: '14px sans-serif',
+            fillColor: window.Cesium.Color.WHITE,
+            style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new window.Cesium.Cartesian2(0, -10)
+          }
+        });
+        this.analysisEntities.push(startPoint);
+
+        // 搜索附近设施
+        const facilities = await this.searchNearbyFacilities(params);
+        
+        if (!facilities || facilities.length === 0) {
+          this.$refs.sidebar.updateFacilityResults([]);
+          throw new Error('未找到符合条件的设施');
+        }
+
+        // 为每个设施创建标记和路径
+        for (const facility of facilities) {
+          // 创建设施点标记
+          const facilityEntity = this.viewer.entities.add({
+            position: window.Cesium.Cartesian3.fromDegrees(facility.longitude, facility.latitude),
+            point: {
+              pixelSize: 12,
+              color: window.Cesium.Color.fromCssColorString(facility.color),
+              outlineColor: window.Cesium.Color.WHITE,
+              outlineWidth: 2
+            },
+            label: {
+              text: `${facility.name}\n距离: ${(facility.distance / 1000).toFixed(2)}公里`,
+              font: '14px sans-serif',
+              fillColor: window.Cesium.Color.WHITE,
+              style: window.Cesium.LabelStyle.FILL_AND_OUTLINE,
+              outlineWidth: 2,
+              verticalOrigin: window.Cesium.VerticalOrigin.BOTTOM,
+              pixelOffset: new window.Cesium.Cartesian2(0, -10),
+              showBackground: true,
+              backgroundColor: window.Cesium.Color.BLACK.withAlpha(0.7)
+            }
+          });
+
+          try {
+            // 获取实际路径
+            const routeResult = await this.getRoutePath(
+              params.startLon,
+              params.startLat,
+              facility.longitude,  // 使用与显示设施点相同的坐标（已根据底图类型转换）
+              facility.latitude    // 使用与显示设施点相同的坐标（已根据底图类型转换）
+            );
+
+            // 创建路径实体
+            const pathEntity = this.viewer.entities.add({
+              polyline: {
+                positions: routeResult.points,
+                width: 10,
+                material: new window.Cesium.PolylineGlowMaterialProperty({
+                  glowPower: 0.3,
+                  taperPower: 0.5,
+                  color: window.Cesium.Color.fromCssColorString('#FF0000').withAlpha(1)
+                })
+              }
+            });
+
+            // 更新设施信息中的实际步行距离
+            facility.walkingDistance = routeResult.distance;
+
+            // 将实体添加到分析结果中
+            this.analysisEntities.push(facilityEntity, pathEntity);
+          } catch (error) {
+            console.error('获取路径失败:', error);
+            // 如果获取实际路径失败，使用直线连接
+            const pathEntity = this.viewer.entities.add({
+              polyline: {
+                positions: [
+                  window.Cesium.Cartesian3.fromDegrees(params.startLon, params.startLat),
+                  window.Cesium.Cartesian3.fromDegrees(facility.longitude, facility.latitude)
+                ],
+                width: 3,
+                material: window.Cesium.Color.fromCssColorString('#FF0000').withAlpha(0.8)
+              }
+            });
+            this.analysisEntities.push(facilityEntity, pathEntity);
+          }
+        }
+
+        // 更新搜索结果显示
+        this.$refs.sidebar.updateFacilityResults(facilities.map(f => ({
+          ...f,
+          walkingDistance: f.walkingDistance ? `步行距离: ${(f.walkingDistance / 1000).toFixed(2)}公里` : undefined
+        })));
+
+        // 调整视图以显示所有设施
+        this.viewer.zoomTo(this.viewer.entities);
+
+      } catch (error) {
+        console.error('处理设施搜索失败:', error);
+        alert(error.message || '处理设施搜索失败，请重试');
+      }
+    },
+
+    // 搜索附近设施
+    async searchNearbyFacilities(params) {
+      try {
+        console.log('开始搜索设施，参数:', params);
+
+        // 根据当前底图类型进行坐标转换
+        let searchLon = params.startLon;
+        let searchLat = params.startLat;
+
+        // 如果当前底图不是高德地图，需要将WGS84坐标转换为GCJ02
+        if (this.currentImagery !== 'amap') {
+          const converted = this.transformCoordinates(params.startLon, params.startLat, 'WGS84', 'GCJ02');
+          searchLon = converted.longitude;
+          searchLat = converted.latitude;
+          console.log('搜索起点坐标已从WGS84转换为GCJ02:', 
+            `(${params.startLon}, ${params.startLat}) -> (${searchLon}, ${searchLat})`
+          );
+        } else {
+          console.log('使用原始GCJ02坐标调用高德API');
+        }
+
+        // 构建请求 URL
+        const url = new URL('https://restapi.amap.com/v5/place/around');
+        url.searchParams.append('key', this.amapConfig.key);
+        url.searchParams.append('keywords', params.facilityName);
+        url.searchParams.append('location', `${searchLon},${searchLat}`);
+        url.searchParams.append('radius', '10000'); // 10公里范围
+        url.searchParams.append('page_size', '20'); // 增加返回数量
+        url.searchParams.append('extensions', 'all'); // 返回完整的POI信息
+
+        console.log('高德地图 API 请求:', url.toString());
+
+        // 发送请求
+        const response = await fetch(url);
+        const data = await response.json();
+        console.log('API 返回数据:', data);
+
+        if (data.status !== '1') {
+          throw new Error(`API 请求失败: ${data.info}`);
+        }
+
+        if (!data.pois || data.pois.length === 0) {
+          console.log('未找到任何设施');
+          return [];
+        }
+
+        // 处理返回的数据
+        const facilities = data.pois.map(poi => {
+          try {
+            // 解析坐标 (高德返回的坐标是GCJ02)
+            const [longitude, latitude] = poi.location.split(',').map(Number);
+            
+            // 获取设施类型
+            const type = this.getAmapFacilityType(poi.type);
+            
+            // 如果当前底图不是高德地图，需要将GCJ02坐标转换为WGS84用于显示
+            let displayLon = longitude;
+            let displayLat = latitude;
+            
+            if (this.currentImagery !== 'amap') {
+              const wgs84Point = this.transformCoordinates(longitude, latitude, 'GCJ02', 'WGS84');
+              displayLon = wgs84Point.longitude;
+              displayLat = wgs84Point.latitude;
+            }
+            
+            return {
+              name: poi.name,
+              type: type,
+              longitude: displayLon,  // 用于显示的坐标
+              latitude: displayLat,   // 用于显示的坐标
+              gcj02Longitude: longitude, // 保存原始GCJ02坐标用于API调用
+              gcj02Latitude: latitude,   // 保存原始GCJ02坐标用于API调用
+              color: this.getFacilityColor(type),
+              distance: Number(poi.distance || 0),
+              address: poi.address || '暂无地址信息',
+              tel: poi.tel || '暂无电话信息',
+              businessArea: poi.business_area || '暂无商圈信息'
+            };
+          } catch (error) {
+            console.error('处理POI数据时出错:', error);
+            return null;
+          }
+        }).filter(Boolean);
+
+        console.log('处理后的设施数据:', facilities);
+
+        // 按距离排序
+        facilities.sort((a, b) => a.distance - b.distance);
+
+        // 返回指定数量的最近设施
+        const result = facilities.slice(0, params.count);
+        console.log('返回的最终结果:', result);
+
+        return result;
+
+      } catch (error) {
+        console.error('搜索设施失败:', error);
+        throw error;
+      }
+    },
+
+    // 获取高德地图设施类型
+    getAmapFacilityType(typeCode) {
+      const types = {
+        '090100': '医院',
+        '090101': '综合医院',
+        '090102': '专科医院',
+        '090200': '诊所',
+        '090300': '药店',
+        '090400': '急救中心',
+        '090500': '疾控中心'
+      };
+      
+      // 获取第一个匹配的类型代码
+      const mainType = typeCode.split('|')[0];
+      return types[mainType] || '医疗机构';
+    },
+
+    // 获取设施颜色
+    getFacilityColor(type) {
+      const colors = {
+        '医院': '#FF0000',
+        '综合医院': '#FF0000',
+        '专科医院': '#FF4500',
+        '诊所': '#FF6347',
+        '药店': '#FFA500',
+        '急救中心': '#FF0000',
+        '疾控中心': '#FF7F50',
+        '医疗机构': '#FFA07A'
+      };
+      return colors[type] || '#FF0000';
+    },
+
+    // 计算两点之间的距离（米）
+    calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // 地球半径（米）
+      const φ1 = this.toRadians(lat1);
+      const φ2 = this.toRadians(lat2);
+      const Δφ = this.toRadians(lat2 - lat1);
+      const Δλ = this.toRadians(lon2 - lon1);
+
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+      return R * c;
+    },
+
+    // 角度转弧度
+    toRadians(degrees) {
+      return degrees * Math.PI / 180;
     },
   },
   mounted() {
